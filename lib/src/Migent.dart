@@ -52,43 +52,30 @@ class Migent {
 
   /// Returns if this version should be execute
   Future<bool> _checkIfMigrationShouldBeExecuted(String version) async {
-    try {
-      final query = """
-        SELECT EXISTS (
-          SELECT 1
-          FROM information_schema.tables 
-          WHERE table_schema = '$dbName' AND
-          table_name = '$_migrationsTableName'
+    final tableExistsQuery = """
+      SELECT to_regclass('$_migrationsTableName');
+    """;
+
+    final tableExistsResult = await connection.query(tableExistsQuery);
+
+    if (tableExistsResult.first[0] == null) {
+      const createQuery = '''
+        CREATE TABLE $_migrationsTableName (
+          id SERIAL PRIMARY KEY,
+          version VARCHAR(100) NOT NULL
         );
-      """;
-
-      final tableExistsResult = await connection.query(query);
-
-      print(tableExistsResult.first);
-
-      if (tableExistsResult.first[0] == false) {
-        const createQuery = '''
-          CREATE TABLE $_migrationsTableName (
-            id SERIAL PRIMARY KEY,
-            version VARCHAR(100) NOT NULL
-          );
-        ''';
-        await connection.execute(createQuery);
-
-        return true;
-      }
-
-      const checkQuery = '''
-        SELECT version FROM $_migrationsTableName ORDER BY id DESC LIMIT 1; 
       ''';
+      await connection.execute(createQuery);
 
-      final lastVersionResult = await connection.query(checkQuery);
-
-      return lastVersionResult.first[0] != version;
-    } on Error catch (e) {
-      print(e);
+      return true;
     }
 
-    return false;
+    const checkQuery = '''
+      SELECT version FROM $_migrationsTableName ORDER BY id DESC LIMIT 1; 
+    ''';
+
+    final lastVersionResult = await connection.query(checkQuery);
+
+    return lastVersionResult.first[0] != version;
   }
 }
