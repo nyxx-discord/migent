@@ -71,10 +71,12 @@ class Migent {
     }
 
     const checkQuery = '''
-      SELECT version FROM $_migrationsTableName ORDER BY id DESC LIMIT 1; 
+      SELECT version FROM $_migrationsTableName WHERE version = @version; 
     ''';
 
-    final lastVersionResult = await connection.query(checkQuery);
+    final lastVersionResult = await connection.query(checkQuery, substitutionValues: {
+      "version": version
+    });
 
     return lastVersionResult.first[0] != version;
   }
