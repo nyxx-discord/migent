@@ -78,6 +78,6 @@ class Migent {
       "version": version
     });
 
-    return lastVersionResult.first[0] != version;
+    return lastVersionResult.first.first != version;
   }
 }
