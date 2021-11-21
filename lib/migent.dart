@@ -3,4 +3,4 @@
 /// More dartdocs go here.
 library migent;
 
-export 'src/Migent.dart';
+export 'src/migent_migration_runner.dart';

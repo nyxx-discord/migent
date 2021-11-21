@@ -1,34 +1,37 @@
 import 'dart:async';
 
 import 'package:logging/logging.dart';
+import 'package:migent/src/migration_access/migration_access.dart';
 import 'package:postgres/postgres.dart';
 
 const _migrationsTableName = 'run_migrations';
 
-class Migent {
+class MigentMigrationRunner {
   final PostgreSQLConnection connection;
   final String dbName;
+  final IMigrationAccess migrationAccess;
 
   final _logger = Logger('Migrations');
 
   final Map<String, String> enqueuedMigrations = {};
 
-  Migent(this.connection, this.dbName);
+  MigentMigrationRunner(this.connection, this.dbName, this.migrationAccess);
 
-  void enqueueMigration(String version, String migrationString) =>
-      enqueuedMigrations[version] = migrationString;
+  void enqueueMigration(String version, String migrationString) => enqueuedMigrations[version] = migrationString;
 
   FutureOr<void> runMigrations() async {
     for (final queueEntry in enqueuedMigrations.entries) {
       try {
-        await _runMigration(queueEntry.key, queueEntry.value);
+        final migrationData = await migrationAccess.getMigrationData(queueEntry.key, queueEntry.value);
+        final executed = await _runMigration(queueEntry.key, migrationData);
 
-        await connection.execute(
-            'INSERT INTO run_migrations(version) VALUES (@version)',
-            substitutionValues: {'version': queueEntry.key}
-        );
+        if (executed) {
+          await connection.execute('INSERT INTO run_migrations(version) VALUES (@version)', substitutionValues: {'version': queueEntry.key});
 
-        _logger.info('Migration with version: `${queueEntry.key}` executed successfully');
+          _logger.info('Migration with version: `${queueEntry.key}` executed successfully');
+        } else {
+          _logger.info('Migration with version: `${queueEntry.key}` already executed');
+        }
       } on PostgreSQLException catch (e) {
         _logger.severe('Exception occurred when executing migrations: [${e.message}]');
         break;
@@ -38,16 +41,18 @@ class Migent {
     _logger.info('Migrations done!');
   }
 
-  FutureOr<void> _runMigration(String version, String migrationString) async {
+  FutureOr<bool> _runMigration(String version, String migrationString) async {
     final shouldRunMigration = await _checkIfMigrationShouldBeExecuted(version);
 
     if (!shouldRunMigration) {
-      return;
+      return false;
     }
 
     _logger.info('Migration with version: `$version` not present in migration log. Running migration');
 
     await connection.execute(migrationString);
+
+    return true;
   }
 
   /// Returns if this version should be execute
@@ -74,9 +79,7 @@ class Migent {
       SELECT version FROM $_migrationsTableName WHERE version = @version; 
     ''';
 
-    final lastVersionResult = await connection.query(checkQuery, substitutionValues: {
-      "version": version
-    });
+    final lastVersionResult = await connection.query(checkQuery, substitutionValues: {'version': version});
 
     return lastVersionResult.isEmpty;
   }
