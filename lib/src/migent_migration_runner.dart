@@ -7,15 +7,14 @@ import 'package:postgres/postgres.dart';
 const _migrationsTableName = 'run_migrations';
 
 class MigentMigrationRunner {
-  final PostgreSQLConnection connection;
-  final String dbName;
-  final IMigrationAccess migrationAccess;
+  final Connection connection;
+  final String databaseName;
+  final MigrationAccess migrationAccess;
+  final Map<String, String> enqueuedMigrations = {};
 
   final _logger = Logger('Migrations');
 
-  final Map<String, String> enqueuedMigrations = {};
-
-  MigentMigrationRunner(this.connection, this.dbName, this.migrationAccess);
+  MigentMigrationRunner({required this.connection, required this.databaseName, required this.migrationAccess});
 
   void enqueueMigration(String version, String migrationString) => enqueuedMigrations[version] = migrationString;
 
@@ -26,13 +25,14 @@ class MigentMigrationRunner {
         final executed = await _runMigration(queueEntry.key, migrationData);
 
         if (executed) {
-          await connection.execute('INSERT INTO run_migrations(version) VALUES (@version)', substitutionValues: {'version': queueEntry.key});
+          await connection.execute('INSERT INTO run_migrations(version) VALUES (@version)',
+              parameters: {'version': queueEntry.key});
 
           _logger.info('Migration with version: `${queueEntry.key}` executed successfully');
         } else {
           _logger.info('Migration with version: `${queueEntry.key}` already executed');
         }
-      } on PostgreSQLException catch (e) {
+      } on PgException catch (e) {
         _logger.severe('Exception occurred when executing migrations: [${e.message}]');
         break;
       }
@@ -61,7 +61,7 @@ class MigentMigrationRunner {
       SELECT to_regclass('$_migrationsTableName');
     """;
 
-    final tableExistsResult = await connection.query(tableExistsQuery);
+    final tableExistsResult = await connection.execute(tableExistsQuery);
 
     if (tableExistsResult.first[0] == null) {
       const createQuery = '''
@@ -79,7 +79,7 @@ class MigentMigrationRunner {
       SELECT version FROM $_migrationsTableName WHERE version = @version; 
     ''';
 
-    final lastVersionResult = await connection.query(checkQuery, substitutionValues: {'version': version});
+    final lastVersionResult = await connection.execute(checkQuery, parameters: {'version': version});
 
     return lastVersionResult.isEmpty;
   }
