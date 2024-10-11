@@ -25,8 +25,7 @@ class MigentMigrationRunner {
         final executed = await _runMigration(queueEntry.key, migrationData);
 
         if (executed) {
-          final statement = await connection.prepare('INSERT INTO run_migrations(version) VALUES (@version)');
-          await statement.run({'version': queueEntry.key});
+          await connection.execute(Sql.named('INSERT INTO run_migrations(version) VALUES (@version)'), parameters: {'version': queueEntry.key});
 
           _logger.info('Migration with version: `${queueEntry.key}` executed successfully');
         } else {
@@ -75,12 +74,11 @@ class MigentMigrationRunner {
       return true;
     }
 
-    const checkQuery = '''
+    final checkQuery = Sql.named('''
       SELECT version FROM $_migrationsTableName WHERE version = @version; 
-    ''';
+    ''');
 
-    final statement = await connection.prepare(checkQuery);
-    final lastVersionResult = await statement.run({'version': version});
+    final lastVersionResult = await connection.execute(checkQuery, parameters: {'version': version});
 
     return lastVersionResult.isEmpty;
   }
