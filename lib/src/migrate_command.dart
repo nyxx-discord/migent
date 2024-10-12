@@ -16,7 +16,8 @@ class MigrateCommand extends Command<void> {
 
   MigrateCommand() {
     argParser
-      ..addOption("directory", abbr: 'd', defaultsTo: "migrations/", help: "Directory where migrations files are located")
+      ..addOption("directory",
+          abbr: 'd', defaultsTo: "migrations/", help: "Directory where migrations files are located")
       ..addOption("host", abbr: "h", help: "Host of database")
       ..addOption("port", abbr: "p", help: "Port of database", defaultsTo: "5432")
       ..addOption("user", abbr: "u", help: "Database user")
@@ -45,11 +46,20 @@ class MigrateCommand extends Command<void> {
       throw StateError("Missing or empty 'database' options");
     }
 
-    final connection = PostgreSQLConnection(host, port, database, username: argResults!['user'] as String?, password: argResults!['password'] as String?);
+    final connection = await Connection.open(
+      Endpoint(
+          host: host,
+          port: port,
+          database: database,
+          username: argResults!['user'] as String?,
+          password: argResults!['password'] as String?),
+    );
 
-    final migrationRunner = MigentMigrationRunner(connection, database, FileMigrationAccess());
+    final migrationRunner =
+        MigentMigrationRunner(connection: connection, databaseName: database, migrationAccess: FileMigrationAccess());
 
-    final directory = Directory.fromUri(Uri.directory("${Directory.current.absolute.path}/${argResults!['directory']}"));
+    final directory =
+        Directory.fromUri(Uri.directory("${Directory.current.absolute.path}/${argResults!['directory']}"));
     final directoryFiles = directory.list().where((entity) => entity is File);
 
     await for (final file in directoryFiles) {
