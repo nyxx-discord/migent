@@ -1,6 +1,6 @@
 name: migent
 description: Tool to run and manage migrations of your database schema
-version: 1.1.0
+version: 1.2.0
 homepage: https://github.com/nyxx-discord/migent
 
 executables:
