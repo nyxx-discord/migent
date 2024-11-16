@@ -14,7 +14,6 @@ class MigentMigrationRunner {
   final Map<String, String> enqueuedMigrations = {};
 
   final _logger = Logger('Migrations');
-  final _lineSplitter = LineSplitter();
 
   MigentMigrationRunner({required this.connection, required this.databaseName, required this.migrationAccess});
 
@@ -48,7 +47,7 @@ class MigentMigrationRunner {
 
     _logger.info('Migration with version: `$version` not present in migration log. Running migration');
 
-    final migrationLines = _lineSplitter.convert(migrationString).map((s) => s.trim()).where((s) => s.isNotEmpty);
+    final migrationLines = migrationString.split(";").map((s) => s.trim()).where((s) => s.isNotEmpty);
     for (final migrationLine in migrationLines) {
       await session.execute(migrationLine);
     }
